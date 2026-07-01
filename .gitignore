@@ -1,2 +1,22 @@
 /.vscode
 mash
+
+# Build artifacts
+*.o
+*.out
+*.exe
+*.obj
+*.a
+*.so
+*.dll
+
+# Debug / temp files
+*.log
+*.tmp
+*.swp
+*~
+
+# Build directories
+/build
+/bin
+/obj

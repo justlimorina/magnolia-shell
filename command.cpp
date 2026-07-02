@@ -7,6 +7,8 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/utsname.h>
+#include <sys/sysinfo.h>
+#include <signal.h>
 #include <limits.h>
 #include <cstring>
 #include <vector>
@@ -17,6 +19,7 @@
 #include <chrono>
 #include <ctime>
 #include <cstdio>
+#include <filesystem>
 
 namespace MagnoliaOS {
     std::string getCurrentDirectory() {
@@ -91,6 +94,14 @@ namespace MagnoliaOS {
         std::cout << "  touch <file>       Creates an empty file or updates timestamp.\n";
         std::cout << "  cp <src> <dst>     Copies a file.\n";
         std::cout << "  mv <src> <dst>     Moves or renames a file.\n";
+        std::cout << "  which <cmd>        Locates a command in PATH.\n";
+        std::cout << "  kill [-sig] <pid>  Sends a signal to a process.\n";
+        std::cout << "  grep <pat> [file]  Searches matching text lines.\n";
+        std::cout << "  head [-n N] [file] Prints first N lines of a file.\n";
+        std::cout << "  tail [-n N] [file] Prints last N lines of a file.\n";
+        std::cout << "  find [path] [pat]  Finds files/directories recursively.\n";
+        std::cout << "  free               Shows memory statistics.\n";
+        std::cout << "  uptime             Displays system uptime.\n";
         std::cout << "  exit               Exits the Magnolia Shell.\n";
     }
 
@@ -432,6 +443,331 @@ namespace MagnoliaOS {
 
         if (chdir(target) != 0) {
             std::cout << "cd: no such file or directory: " << path << std::endl;
+        }
+    }
+
+    void executeWhich(const std::vector<std::string>& args) {
+        if (args.empty()) {
+            return;
+        }
+        const char* pathEnv = getenv("PATH");
+        if (!pathEnv) {
+            return;
+        }
+        std::string pathStr(pathEnv);
+        std::vector<std::string> dirs;
+        std::stringstream ss(pathStr);
+        std::string dir;
+        while (std::getline(ss, dir, ':')) {
+            dirs.push_back(dir);
+        }
+
+        for (const auto& cmd : args) {
+            if (cmd.find('/') != std::string::npos) {
+                if (access(cmd.c_str(), X_OK) == 0) {
+                    std::cout << cmd << std::endl;
+                }
+            } else {
+                for (const auto& d : dirs) {
+                    std::string fullPath = d + "/" + cmd;
+                    if (access(fullPath.c_str(), X_OK) == 0) {
+                        std::cout << fullPath << std::endl;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    void executeKill(const std::vector<std::string>& args) {
+        if (args.empty()) {
+            std::cout << "kill: usage: kill [-signal] pid..." << std::endl;
+            return;
+        }
+        int sig = SIGTERM;
+        size_t startIdx = 0;
+        if (args[0][0] == '-') {
+            std::string sigStr = args[0].substr(1);
+            if (std::all_of(sigStr.begin(), sigStr.end(), ::isdigit)) {
+                sig = std::stoi(sigStr);
+            } else {
+                std::string name = sigStr;
+                std::transform(name.begin(), name.end(), name.begin(), ::toupper);
+                if (name.substr(0, 3) == "SIG") {
+                    name = name.substr(3);
+                }
+                if (name == "HUP") sig = SIGHUP;
+                else if (name == "INT") sig = SIGINT;
+                else if (name == "QUIT") sig = SIGQUIT;
+                else if (name == "ILL") sig = SIGILL;
+                else if (name == "TRAP") sig = SIGTRAP;
+                else if (name == "ABRT") sig = SIGABRT;
+                else if (name == "BUS") sig = SIGBUS;
+                else if (name == "FPE") sig = SIGFPE;
+                else if (name == "KILL") sig = SIGKILL;
+                else if (name == "USR1") sig = SIGUSR1;
+                else if (name == "SEGV") sig = SIGSEGV;
+                else if (name == "USR2") sig = SIGUSR2;
+                else if (name == "PIPE") sig = SIGPIPE;
+                else if (name == "ALRM") sig = SIGALRM;
+                else if (name == "TERM") sig = SIGTERM;
+                else {
+                    std::cout << "kill: invalid signal specification" << std::endl;
+                    return;
+                }
+            }
+            startIdx = 1;
+        }
+        if (startIdx >= args.size()) {
+            std::cout << "kill: missing pid operand" << std::endl;
+            return;
+        }
+        for (size_t i = startIdx; i < args.size(); ++i) {
+            try {
+                pid_t pid = std::stoi(args[i]);
+                if (kill(pid, sig) != 0) {
+                    std::perror("kill");
+                }
+            } catch (...) {
+                std::cout << "kill: invalid pid: " << args[i] << std::endl;
+            }
+        }
+    }
+
+    void executeGrep(const std::vector<std::string>& args) {
+        if (args.empty()) {
+            std::cout << "grep: usage: grep pattern [file...]" << std::endl;
+            return;
+        }
+        std::string pattern = args[0];
+        if (args.size() == 1) {
+            std::string line;
+            while (std::getline(std::cin, line)) {
+                if (line.find(pattern) != std::string::npos) {
+                    std::cout << line << std::endl;
+                }
+            }
+        } else {
+            bool showFilename = (args.size() > 2);
+            for (size_t i = 1; i < args.size(); ++i) {
+                std::ifstream file(args[i]);
+                if (!file.is_open()) {
+                    std::cout << "grep: " << args[i] << ": No such file or directory" << std::endl;
+                    continue;
+                }
+                std::string line;
+                while (std::getline(file, line)) {
+                    if (line.find(pattern) != std::string::npos) {
+                        if (showFilename) {
+                            std::cout << args[i] << ":" << line << std::endl;
+                        } else {
+                            std::cout << line << std::endl;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void executeHead(const std::vector<std::string>& args) {
+        size_t limit = 10;
+        size_t startIdx = 0;
+        if (!args.empty() && args[0].size() > 2 && args[0].substr(0, 2) == "-n") {
+            try {
+                std::string numStr = args[0].substr(2);
+                if (numStr.empty() && args.size() > 1) {
+                    limit = std::stoul(args[1]);
+                    startIdx = 2;
+                } else {
+                    limit = std::stoul(numStr);
+                    startIdx = 1;
+                }
+            } catch (...) {
+                std::cout << "head: invalid line count" << std::endl;
+                return;
+            }
+        } else if (!args.empty() && args[0][0] == '-') {
+            try {
+                limit = std::stoul(args[0].substr(1));
+                startIdx = 1;
+            } catch (...) {}
+        }
+        if (startIdx >= args.size()) {
+            std::string line;
+            size_t count = 0;
+            while (count < limit && std::getline(std::cin, line)) {
+                std::cout << line << std::endl;
+                count++;
+            }
+            return;
+        }
+        bool multipleFiles = (args.size() - startIdx > 1);
+        for (size_t i = startIdx; i < args.size(); ++i) {
+            std::ifstream file(args[i]);
+            if (!file.is_open()) {
+                std::cout << "head: cannot open '" << args[i] << "' for reading" << std::endl;
+                continue;
+            }
+            if (multipleFiles) {
+                if (i > startIdx) std::cout << std::endl;
+                std::cout << "==> " << args[i] << " <==" << std::endl;
+            }
+            std::string line;
+            size_t count = 0;
+            while (count < limit && std::getline(file, line)) {
+                std::cout << line << std::endl;
+                count++;
+            }
+        }
+    }
+
+    void executeTail(const std::vector<std::string>& args) {
+        size_t limit = 10;
+        size_t startIdx = 0;
+        if (!args.empty() && args[0].size() > 2 && args[0].substr(0, 2) == "-n") {
+            try {
+                std::string numStr = args[0].substr(2);
+                if (numStr.empty() && args.size() > 1) {
+                    limit = std::stoul(args[1]);
+                    startIdx = 2;
+                } else {
+                    limit = std::stoul(numStr);
+                    startIdx = 1;
+                }
+            } catch (...) {
+                std::cout << "tail: invalid line count" << std::endl;
+                return;
+            }
+        } else if (!args.empty() && args[0][0] == '-') {
+            try {
+                limit = std::stoul(args[0].substr(1));
+                startIdx = 1;
+            } catch (...) {}
+        }
+        if (startIdx >= args.size()) {
+            std::vector<std::string> buffer;
+            std::string line;
+            while (std::getline(std::cin, line)) {
+                buffer.push_back(line);
+                if (buffer.size() > limit) {
+                    buffer.erase(buffer.begin());
+                }
+            }
+            for (const auto& l : buffer) {
+                std::cout << l << std::endl;
+            }
+            return;
+        }
+        bool multipleFiles = (args.size() - startIdx > 1);
+        for (size_t i = startIdx; i < args.size(); ++i) {
+            std::ifstream file(args[i]);
+            if (!file.is_open()) {
+                std::cout << "tail: cannot open '" << args[i] << "' for reading" << std::endl;
+                continue;
+            }
+            if (multipleFiles) {
+                if (i > startIdx) std::cout << std::endl;
+                std::cout << "==> " << args[i] << " <==" << std::endl;
+            }
+            std::vector<std::string> buffer;
+            std::string line;
+            while (std::getline(file, line)) {
+                buffer.push_back(line);
+                if (buffer.size() > limit) {
+                    buffer.erase(buffer.begin());
+                }
+            }
+            for (const auto& l : buffer) {
+                std::cout << l << std::endl;
+            }
+        }
+    }
+
+    void executeFind(const std::vector<std::string>& args) {
+        std::string path = ".";
+        std::string pattern = "";
+        if (args.size() == 1) {
+            pattern = args[0];
+        } else if (args.size() >= 2) {
+            path = args[0];
+            pattern = args[1];
+        }
+
+        try {
+            namespace fs = std::filesystem;
+            if (!fs::exists(path)) {
+                std::cout << "find: '" << path << "': No such file or directory" << std::endl;
+                return;
+            }
+            std::string lowerPattern = pattern;
+            std::transform(lowerPattern.begin(), lowerPattern.end(), lowerPattern.begin(), ::tolower);
+
+            for (const auto& entry : fs::recursive_directory_iterator(path, fs::directory_options::skip_permission_denied)) {
+                std::string filename = entry.path().filename().string();
+                std::string lowerFilename = filename;
+                std::transform(lowerFilename.begin(), lowerFilename.end(), lowerFilename.begin(), ::tolower);
+                
+                if (pattern.empty() || lowerFilename.find(lowerPattern) != std::string::npos) {
+                    std::cout << entry.path().string() << std::endl;
+                }
+            }
+        } catch (const std::exception& e) {
+            std::cout << "find: error: " << e.what() << std::endl;
+        }
+    }
+
+    void executeFree() {
+        std::ifstream file("/proc/meminfo");
+        if (!file.is_open()) {
+            std::cout << "free: cannot open /proc/meminfo" << std::endl;
+            return;
+        }
+        std::string line;
+        long long total = 0, freeMem = 0, available = 0;
+        while (std::getline(file, line)) {
+            std::stringstream ss(line);
+            std::string key;
+            long long val;
+            ss >> key >> val;
+            if (key == "MemTotal:") total = val;
+            else if (key == "MemFree:") freeMem = val;
+            else if (key == "MemAvailable:") available = val;
+        }
+        if (total > 0) {
+            long long used = total - freeMem;
+            std::cout << std::left << std::setw(15) << ""
+                      << std::right << std::setw(15) << "total"
+                      << std::setw(15) << "used"
+                      << std::setw(15) << "free"
+                      << std::setw(15) << "available" << std::endl;
+            std::cout << std::left << std::setw(15) << "Mem:"
+                      << std::right << std::setw(15) << total
+                      << std::setw(15) << used
+                      << std::setw(15) << freeMem
+                      << std::setw(15) << available << "  (kB)" << std::endl;
+        }
+    }
+
+    void executeUptime() {
+        struct sysinfo info;
+        if (sysinfo(&info) == 0) {
+            long seconds = info.uptime;
+            long days = seconds / (24 * 3600);
+            seconds %= (24 * 3600);
+            long hours = seconds / 3600;
+            seconds %= 3600;
+            long minutes = seconds / 60;
+            seconds %= 60;
+
+            std::cout << "uptime: ";
+            if (days > 0) {
+                std::cout << days << " day" << (days > 1 ? "s" : "") << ", ";
+            }
+            std::cout << std::setw(2) << std::setfill('0') << hours << ":"
+                      << std::setw(2) << std::setfill('0') << minutes << ":"
+                      << std::setw(2) << std::setfill('0') << seconds << std::setfill(' ') << std::endl;
+        } else {
+            std::perror("uptime");
         }
     }
 }

@@ -410,6 +410,30 @@ int main() {
         else if (command == "date") {
             MagnoliaOS::executeDate();
         }
+        else if (command == "which") {
+            MagnoliaOS::executeWhich(args);
+        }
+        else if (command == "kill") {
+            MagnoliaOS::executeKill(args);
+        }
+        else if (command == "grep") {
+            MagnoliaOS::executeGrep(args);
+        }
+        else if (command == "head") {
+            MagnoliaOS::executeHead(args);
+        }
+        else if (command == "tail") {
+            MagnoliaOS::executeTail(args);
+        }
+        else if (command == "find") {
+            MagnoliaOS::executeFind(args);
+        }
+        else if (command == "free") {
+            MagnoliaOS::executeFree();
+        }
+        else if (command == "uptime") {
+            MagnoliaOS::executeUptime();
+        }
         else if (command == "help") {
             MagnoliaOS::executeHelp();
         }

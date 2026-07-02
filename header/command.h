@@ -23,5 +23,13 @@ namespace MagnoliaOS {
     void executeWhoami();
     void executeUname();
     void executeDate();
+    void executeWhich(const std::vector<std::string>& args);
+    void executeKill(const std::vector<std::string>& args);
+    void executeGrep(const std::vector<std::string>& args);
+    void executeHead(const std::vector<std::string>& args);
+    void executeTail(const std::vector<std::string>& args);
+    void executeFind(const std::vector<std::string>& args);
+    void executeFree();
+    void executeUptime();
     std::string getCurrentDirectory();
 }

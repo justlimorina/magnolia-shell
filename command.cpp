@@ -60,8 +60,11 @@ namespace MagnoliaOS {
         return owner + ":" + group;
     }
 
-    void executeEcho(const std::string& args) {
-        std::cout << args << std::endl;
+    void executeEcho(const std::vector<std::string>& args) {
+        for (size_t i = 0; i < args.size(); ++i) {
+            std::cout << args[i] << (i + 1 < args.size() ? " " : "");
+        }
+        std::cout << std::endl;
     }
 
     void executeHelp() {
@@ -99,65 +102,72 @@ namespace MagnoliaOS {
         std::cout << getCurrentDirectory() << std::endl;
     }
 
-    void executeMkdir(const std::string& args) {
+    void executeMkdir(const std::vector<std::string>& args) {
         if (args.empty()) {
             std::cout << "mkdir: missing operand" << std::endl;
             return;
         }
-        if (mkdir(args.c_str(), 0755) != 0) {
-            std::perror("mkdir");
+        for (const auto& path : args) {
+            if (mkdir(path.c_str(), 0755) != 0) {
+                std::perror("mkdir");
+            }
         }
     }
 
-    void executeRm(const std::string& args) {
+    void executeRm(const std::vector<std::string>& args) {
         if (args.empty()) {
             std::cout << "rm: missing operand" << std::endl;
             return;
         }
-        if (remove(args.c_str()) != 0) {
-            std::perror("rm");
+        for (const auto& path : args) {
+            if (remove(path.c_str()) != 0) {
+                std::perror("rm");
+            }
         }
     }
 
-    void executeCat(const std::string& args) {
+    void executeCat(const std::vector<std::string>& args) {
         if (args.empty()) {
             std::cout << "cat: missing operand" << std::endl;
             return;
         }
-        std::ifstream file(args);
-        if (!file.is_open()) {
-            std::cout << "cat: cannot open '" << args << "'" << std::endl;
-            return;
-        }
-        std::string line;
-        while (std::getline(file, line)) {
-            std::cout << line << std::endl;
+        for (const auto& path : args) {
+            std::ifstream file(path);
+            if (!file.is_open()) {
+                std::cout << "cat: cannot open '" << path << "'" << std::endl;
+                continue;
+            }
+            std::string line;
+            while (std::getline(file, line)) {
+                std::cout << line << std::endl;
+            }
         }
     }
 
-    void executeTouch(const std::string& args) {
+    void executeTouch(const std::vector<std::string>& args) {
         if (args.empty()) {
             std::cout << "touch: missing file operand" << std::endl;
             return;
         }
-        std::ofstream file(args, std::ios::app);
-        if (!file) {
-            std::cout << "touch: cannot touch '" << args << "'" << std::endl;
+        for (const auto& path : args) {
+            std::ofstream file(path, std::ios::app);
+            if (!file) {
+                std::cout << "touch: cannot touch '" << path << "'" << std::endl;
+            }
         }
     }
 
-    void executeCp(const std::string& args) {
-        if (args.empty()) {
-            std::cout << "cp: missing file operand" << std::endl;
+    void executeCp(const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            if (args.empty()) {
+                std::cout << "cp: missing file operand" << std::endl;
+            } else {
+                std::cout << "cp: missing destination file operand after '" << args[0] << "'" << std::endl;
+            }
             return;
         }
-        size_t pos = args.find(' ');
-        if (pos == std::string::npos) {
-            std::cout << "cp: missing destination file operand after '" << args << "'" << std::endl;
-            return;
-        }
-        std::string source = args.substr(0, pos);
-        std::string dest = args.substr(pos + 1);
+        std::string source = args[0];
+        std::string dest = args[1];
         std::ifstream in(source, std::ios::binary);
         std::ofstream out(dest, std::ios::binary);
         if (!in) {
@@ -171,30 +181,29 @@ namespace MagnoliaOS {
         out << in.rdbuf();
     }
 
-    void executeMv(const std::string& args) {
-        if (args.empty()) {
-            std::cout << "mv: missing file operand" << std::endl;
+    void executeMv(const std::vector<std::string>& args) {
+        if (args.size() < 2) {
+            if (args.empty()) {
+                std::cout << "mv: missing file operand" << std::endl;
+            } else {
+                std::cout << "mv: missing destination file operand after '" << args[0] << "'" << std::endl;
+            }
             return;
         }
-        size_t pos = args.find(' ');
-        if (pos == std::string::npos) {
-            std::cout << "mv: missing destination file operand after '" << args << "'" << std::endl;
-            return;
-        }
-        std::string source = args.substr(0, pos);
-        std::string dest = args.substr(pos + 1);
+        std::string source = args[0];
+        std::string dest = args[1];
         if (std::rename(source.c_str(), dest.c_str()) != 0) {
             std::perror("mv");
         }
     }
 
-    void executeChmod(const std::string& args) {
-        std::istringstream ss(args);
-        std::string modeStr, path;
-        if (!(ss >> modeStr >> path)) {
+    void executeChmod(const std::vector<std::string>& args) {
+        if (args.size() < 2) {
             std::cout << "chmod: missing operand" << std::endl;
             return;
         }
+        std::string modeStr = args[0];
+        std::string path = args[1];
         char* endptr = nullptr;
         long mode = std::strtol(modeStr.c_str(), &endptr, 8);
         if (*endptr != '\0') {
@@ -206,13 +215,13 @@ namespace MagnoliaOS {
         }
     }
 
-    void executeChown(const std::string& args) {
-        std::istringstream ss(args);
-        std::string ownerGroup, path;
-        if (!(ss >> ownerGroup >> path)) {
+    void executeChown(const std::vector<std::string>& args) {
+        if (args.size() < 2) {
             std::cout << "chown: missing operand" << std::endl;
             return;
         }
+        std::string ownerGroup = args[0];
+        std::string path = args[1];
         std::string owner;
         std::string group;
         size_t colon = ownerGroup.find(':');
@@ -245,13 +254,13 @@ namespace MagnoliaOS {
         }
     }
 
-    void executeChgrp(const std::string& args) {
-        std::istringstream ss(args);
-        std::string group, path;
-        if (!(ss >> group >> path)) {
+    void executeChgrp(const std::vector<std::string>& args) {
+        if (args.size() < 2) {
             std::cout << "chgrp: missing operand" << std::endl;
             return;
         }
+        std::string group = args[0];
+        std::string path = args[1];
         gid_t gid = -1;
         if (struct group* gr = getgrnam(group.c_str())) {
             gid = gr->gr_gid;
@@ -301,8 +310,8 @@ namespace MagnoliaOS {
         std::cout << std::put_time(std::localtime(&nowTime), "%a %b %d %H:%M:%S %Z %Y") << std::endl;
     }
 
-    void executeLs(const std::string& args) {
-        std::string path = args.empty() ? "." : args;
+    void executeLs(const std::vector<std::string>& args) {
+        std::string path = args.empty() ? "." : args[0];
         struct stat path_stat;
         if (stat(path.c_str(), &path_stat) != 0) {
             std::cout << "ls: cannot access '" << path << "': No such file or directory" << std::endl;
@@ -410,14 +419,14 @@ namespace MagnoliaOS {
         }
     }
 
-    void executeCd(const std::string& args) {
+    void executeCd(const std::vector<std::string>& args) {
         const char* target = nullptr;
         std::string path;
         if (args.empty()) {
             target = getenv("HOME");
             path = target ? target : "/";
         } else {
-            path = args;
+            path = args[0];
             target = path.c_str();
         }
 

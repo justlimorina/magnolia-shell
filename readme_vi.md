@@ -46,7 +46,18 @@ Bên cạnh việc thực thi tệp chương trình bên ngoài qua `execvp`, `m
 
 ## Bắt đầu Sử dụng
 
-### Biên dịch
+### Tải Binary Đã Biên Dịch Sẵn
+Bạn có thể tải trực tiếp file thực thi đã biên dịch sẵn từ trang **Releases** của repository này:
+- **Linux (amd64)**: `mash-linux-amd64`
+- **macOS (Universal - Intel & Apple Silicon)**: `mash-darwin-universal`
+
+Sau khi tải về, cấp quyền thực thi và chạy:
+```bash
+chmod +x mash-linux-amd64 # hoặc mash-darwin-universal
+./mash-linux-amd64
+```
+
+### Tự Biên Dịch Từ Nguồn
 Biên dịch dự án thông qua tập lệnh build có sẵn:
 ```bash
 ./build.sh

@@ -46,7 +46,18 @@ In addition to running external programs via `execvp`, `mash` implements the fol
 
 ## Getting Started
 
-### Compile
+### Download Pre-built Binary
+You can download the compiled binaries directly from the **Releases** page of this repository:
+- **Linux (amd64)**: `mash-linux-amd64`
+- **macOS (Universal - Intel & Apple Silicon)**: `mash-darwin-universal`
+
+After downloading, grant execution permissions and run:
+```bash
+chmod +x mash-linux-amd64 # or mash-darwin-universal
+./mash-linux-amd64
+```
+
+### Compile from Source
 Compile the shell executable using the provided build script:
 ```bash
 ./build.sh

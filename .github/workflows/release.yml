@@ -1,0 +1,72 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: mash-linux-amd64
+          - os: macos-latest
+            artifact_name: mash-darwin-universal
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Compile on Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          g++ -std=c++17 -O2 -Wall -Wextra -Wshadow main.cpp command.cpp -o ${{ matrix.artifact_name }}
+
+      - name: Compile on macOS (Universal Binary)
+        if: matrix.os == 'macos-latest'
+        run: |
+          clang++ -std=c++17 -O2 -Wall -Wextra -Wshadow -arch x86_64 -arch arm64 main.cpp command.cpp -o ${{ matrix.artifact_name }}
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Linux binary
+        uses: actions/download-artifact@v4
+        with:
+          name: mash-linux-amd64
+          path: .
+
+      - name: Download macOS binary
+        uses: actions/download-artifact@v4
+        with:
+          name: mash-darwin-universal
+          path: .
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            mash-linux-amd64
+            mash-darwin-universal
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

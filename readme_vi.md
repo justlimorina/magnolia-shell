@@ -49,11 +49,11 @@ Bên cạnh việc thực thi tệp chương trình bên ngoài qua `execvp`, `m
 ### Tải Binary Đã Biên Dịch Sẵn
 Bạn có thể tải trực tiếp file thực thi đã biên dịch sẵn từ trang **Releases** của repository này:
 - **Linux (amd64)**: `mash-linux-amd64`
-- **macOS (Universal - Intel & Apple Silicon)**: `mash-darwin-universal`
+- **macOS (Universal - Intel & Apple Silicon)**: `mash-macos`
 
 Sau khi tải về, cấp quyền thực thi và chạy:
 ```bash
-chmod +x mash-linux-amd64 # hoặc mash-darwin-universal
+chmod +x mash-linux-amd64 # hoặc mash-macos
 ./mash-linux-amd64
 ```
 

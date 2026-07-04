@@ -63,7 +63,7 @@ jobs:
       - name: Download macOS binary
         uses: actions/download-artifact@v4
         with:
-          name: mash-darwin-universal
+          name: mash-macos
           path: .
 
       - name: Create Release
@@ -71,7 +71,7 @@ jobs:
         with:
           files: |
             mash-linux-amd64
-            mash-darwin-universal
+            mash-macos
           draft: false
           prerelease: false
         env:

@@ -71,7 +71,7 @@ namespace MagnoliaOS {
     }
 
     void executeHelp() {
-        std::cout << "Magnolia Shell (mash), version 0.1.0\n";
+        std::cout << "Magnolia Shell (mash), version 1.0.0\n";
         std::cout << "These shell commands are defined internally. Type 'help' to see this list.\n\n";
 
         std::cout << "  echo [arg ...]     Prints the arguments to the standard output.\n";

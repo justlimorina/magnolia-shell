@@ -7,7 +7,12 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/utsname.h>
+#ifdef __linux__
 #include <sys/sysinfo.h>
+#elif defined(__APPLE__)
+#include <sys/sysctl.h>
+#include <mach/mach.h>
+#endif
 #include <signal.h>
 #include <limits.h>
 #include <cstring>
@@ -717,6 +722,7 @@ namespace MagnoliaOS {
     }
 
     void executeFree() {
+#ifdef __linux__
         std::ifstream file("/proc/meminfo");
         if (!file.is_open()) {
             std::cout << "free: cannot open /proc/meminfo" << std::endl;
@@ -746,9 +752,46 @@ namespace MagnoliaOS {
                       << std::setw(15) << freeMem
                       << std::setw(15) << available << "  (kB)" << std::endl;
         }
+#elif defined(__APPLE__)
+        int64_t memTotal = 0;
+        size_t len = sizeof(memTotal);
+        if (sysctlbyname("hw.memsize", &memTotal, &len, NULL, 0) == 0) {
+            vm_size_t page_size;
+            mach_port_t host_port = mach_host_self();
+            mach_msg_type_number_t host_size = sizeof(vm_statistics64_data_t) / sizeof(integer_t);
+            vm_statistics64_data_t vm_stats;
+            
+            if (host_page_size(host_port, &page_size) == KERN_SUCCESS &&
+                host_statistics64(host_port, HOST_VM_INFO64, (host_info64_t)&vm_stats, &host_size) == KERN_SUCCESS) {
+                long long total = memTotal / 1024;
+                long long freeMem = ((long long)vm_stats.free_count * page_size) / 1024;
+                long long active = ((long long)vm_stats.active_count * page_size) / 1024;
+                long long inactive = ((long long)vm_stats.inactive_count * page_size) / 1024;
+                long long wire = ((long long)vm_stats.wire_count * page_size) / 1024;
+                long long used = active + inactive + wire;
+                long long available = freeMem + inactive;
+                
+                std::cout << std::left << std::setw(15) << ""
+                          << std::right << std::setw(15) << "total"
+                          << std::setw(15) << "used"
+                          << std::setw(15) << "free"
+                          << std::setw(15) << "available" << std::endl;
+                std::cout << std::left << std::setw(15) << "Mem:"
+                          << std::right << std::setw(15) << total
+                          << std::setw(15) << used
+                          << std::setw(15) << freeMem
+                          << std::setw(15) << available << "  (kB)" << std::endl;
+                return;
+            }
+        }
+        std::cout << "free: failed to get memory statistics on macOS" << std::endl;
+#else
+        std::cout << "free: not supported on this platform" << std::endl;
+#endif
     }
 
     void executeUptime() {
+#ifdef __linux__
         struct sysinfo info;
         if (sysinfo(&info) == 0) {
             long seconds = info.uptime;
@@ -769,5 +812,34 @@ namespace MagnoliaOS {
         } else {
             std::perror("uptime");
         }
+#elif defined(__APPLE__)
+        struct timeval boottime;
+        size_t len = sizeof(boottime);
+        int mib[2] = {CTL_KERN, KERN_BOOTTIME};
+        if (sysctl(mib, 2, &boottime, &len, NULL, 0) == 0) {
+            time_t boot_sec = boottime.tv_sec;
+            time_t cur_sec = time(NULL);
+            long seconds = cur_sec - boot_sec;
+            
+            long days = seconds / (24 * 3600);
+            seconds %= (24 * 3600);
+            long hours = seconds / 3600;
+            seconds %= 3600;
+            long minutes = seconds / 60;
+            seconds %= 60;
+
+            std::cout << "uptime: ";
+            if (days > 0) {
+                std::cout << days << " day" << (days > 1 ? "s" : "") << ", ";
+            }
+            std::cout << std::setw(2) << std::setfill('0') << hours << ":"
+                      << std::setw(2) << std::setfill('0') << minutes << ":"
+                      << std::setw(2) << std::setfill('0') << seconds << std::setfill(' ') << std::endl;
+        } else {
+            std::perror("uptime");
+        }
+#else
+        std::cout << "uptime: not supported on this platform" << std::endl;
+#endif
     }
 }
